@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://npmcdn.com/babel-core@5.8.38/browser.min.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script type="text/babel" >
+        "use strict";
+
+        let socket;
+        let points = 0;
+        let canvas = document.getElementById("canvas");
+        let ctx = canvas.getContext("2d");
+
+        const setupSocket = () => {
+            socket.on('connect', () => {
+                console.log('connecting');
+        
+                socket.emit('join');             
+            });
+            
+            socket.on('draw', (data) => {
+                console.log(data);
+                handleMessage(data);
+            });
+            
+            socket.on('clear', () => {
+                console.log('clearing canvas');
+                clearCanvas();
+            });
+            
+            socket.on('point', () => {
+                console.log('got the click, adding a point');
+                addPoint();
+            });
+        };
+        
+        const draw = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let keys = Object.keys(draws);
+            
+            for(let i = 0; i < keys.length; i++)
+            {
+                const drawCall = draws[keys[i]];
+                //this square is colored red to indicate it is recieved via websockets, not from this client
+                if(drawCall.local == true){
+                    ctx.fillStyle = "#000000";
+                }
+                else{
+                    ctx.fillStyle = "#FF0000";
+                }
+                
+                ctx.fillRect(drawCall.x, drawCall.y, drawCall.width, drawCall.height);
+            }
+        };
+        
+        const setCalls = () => {
+            let randX = Math.floor(Math.random() * 300);
+            let randY = Math.floor(Math.random() * 300);
+            let time = new Date().getTime();
+            draws[time] = {x: randX, y: randY, width: 100, height: 100, local: true};
+            draw();
+            
+            time = new Date().getTime();
+            let coords = {x: randX, y: randY, width: 100, height: 100};
+            
+            socket.emit('draw', {time: time, coords: coords});
+        };
+        
+        const handleMessage = (data) => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            //draws[data.time] = data.coords;
+            
+            //let keys = Object.keys(draws);
+            
+            const drawCall = data.coords;
+
+            ctx.fillStyle = "#FF0000";
+
+            ctx.fillRect(drawCall.x, drawCall.y, drawCall.width, drawCall.height);
+        };
+
+        const clearCanvas = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        };
+
+        const addPoint = () => {
+            points += 1;
+            document.getElementById('points').innerHTML = points;
+        };
+
+        const init = () => {
+            socket = io.connect();
+            canvas.onmousedown = doMousedown;
+            setupSocket();
+        };
+
+        const doMousedown = (mouseData) => {
+            //get location off mouse in cannvas coordinates
+            var mouse = getMouse(mouseData);
+            //send the area where this was clicked to the server, if it matches send back a point
+            let mouseClick = {x: mouse.x, y: mouse.y};
+            socket.emit('click', mouseClick);
+        }
+
+        const getMouse = (mouseData) => {
+		  var mouse = {}
+		  mouse.x = mouseData.pageX - mouseData.target.offsetLeft;
+		  mouse.y = mouseData.pageY - mouseData.target.offsetTop;
+		  return mouse;
+	   }
+        
+        window.onload = init;
+    
+    </script>
+</head>
+<body>
+    <canvas id="canvas" width="400" height="400" style="border: 1px solid black;"></canvas>
+    <p>Click the squares before anyone else for a point!</p>
+    <p>Points: <span id="points">0</span></p>
+</body>
+</html>
